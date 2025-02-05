@@ -1,5 +1,5 @@
-PROGRAMS = prod_cons_queue \
-           prod_cons_local 
+PROGRAMS = src/prod_cons_queue \
+           src/prod_cons_local 
 		   
 LDLIBS = -lpthread
 
