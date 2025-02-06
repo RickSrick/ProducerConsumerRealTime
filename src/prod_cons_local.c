@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -5,8 +6,9 @@
 #include <unistd.h>
 #include <time.h>
 #include <signal.h>
+#include <termios.h>
 
-
+#include <sched.h> // sched_setaffinity
 /**
  * 
  * @author Riccardo Modolo (212370)
@@ -64,6 +66,37 @@ static void wait_ms(unsigned int ms) {
 
 }
 
+int set_realtime_attribute(pthread_attr_t *attr, int priority, cpu_set_t *cpuset) {
+
+    int status;
+    struct sched_param param;
+    pthread_attr_init(attr);
+
+
+    status = pthread_attr_getschedparam(attr, &param);
+    if(status) {
+        perror("pthread_attr_getschedparam");
+        return status;
+    }
+
+    param.sched_priority = priority;
+    status = pthread_attr_setschedparam(attr, &param);
+    if(status) {
+        perror("pthread_attr_setschedparam");
+        return status;
+    }
+
+    if(cpuset != NULL) {
+        status = pthread_attr_setaffinity_np(attr, sizeof(cpu_set_t), cpuset);
+        if(status) {
+            perror("pthread_attr_setaffinity_np");
+            return status;
+        }
+    }
+    
+    return status;
+}
+
 
 /**
  * Implementation of the consumer routine
@@ -72,6 +105,7 @@ static void wait_ms(unsigned int ms) {
 static void* consumer(void* arg) {
 
     int item;
+    printf("Consumer in CPU %d\n",sched_getcpu());
     while (1) {
 
         pthread_mutex_lock(&mutex);
@@ -100,6 +134,7 @@ static void* consumer(void* arg) {
 static void* producer(void* arg) {
 
     int item = 0;
+    printf("Producer in CPU %d\n",sched_getcpu());
     while (1) {
 
         wait_ms(producing_time);    // Emulate producing time
@@ -126,6 +161,7 @@ static void* producer(void* arg) {
  */
 static void* actor(void* arg) {
 
+    printf("Actor in CPU %d\n",sched_getcpu());
     while (1) {
         wait_ms(checkqueue_time);
         printf("[size]: %d\n", num_elem);
@@ -145,15 +181,68 @@ static void* actor(void* arg) {
     
 }
 
-void interruptHandling(int signum) {
+
+void interrupt_handling(int signum) {
     printf(": code interrupted\n");
     exit(0);
+}
+
+
+/**
+ * function to change via input the digestion rate
+ * @param {arg} NEVER USED
+ */
+static void* input_handling(void* arg) {
+    char c; 
+    static struct termios oldtio, newtio;
+    tcgetattr(0, &oldtio);
+    newtio = oldtio;
+    newtio.c_lflag &= ~ICANON;
+    newtio.c_lflag &= ~ECHO;
+    tcsetattr(0, TCSANOW, &newtio);
+
+    while (1) {
+        fflush(stdout);
+        read(0, &c, 1);
+        if (c == 'm') {
+            digestion_time+= delta_increase;
+            printf("Increase DIGESTION RATE: %d\n", digestion_time);
+        }
+        if( c == 'n') {
+            digestion_time-= delta_decrease;
+            printf("Decrease DIGESTION RATE: %d\n", digestion_time);
+        }
+    }
 }
 
 /********************************************/
 int main(int argc, char* args[]) {
     
-    signal(SIGINT, interruptHandling);
+    signal(SIGINT, interrupt_handling);
+
+    long number_of_processors = sysconf(_SC_NPROCESSORS_ONLN);
+    printf("number of processors: %ld\n", number_of_processors);
+
+
+    // cpu_set_t: This data set is a bitset where each bit represents a CPU.
+    cpu_set_t producer_set, consumer_set, actor_set, input_set;
+
+    // CPU_ZERO: This macro initializes the CPU set set to be the empty set.
+    CPU_ZERO(&producer_set);
+    CPU_ZERO(&consumer_set);
+    CPU_ZERO(&actor_set);
+    CPU_ZERO(&input_set);
+    CPU_SET(0, &producer_set);
+    CPU_SET(1, &consumer_set);
+    CPU_SET(2, &actor_set);
+    CPU_SET(3, &input_set);
+
+
+    pthread_attr_t producer_attr, consumer_attr, actor_attr, input_attr;
+    set_realtime_attribute(&producer_attr, 0, &producer_set);   
+    set_realtime_attribute(&consumer_attr, 0, &consumer_set);   
+    set_realtime_attribute(&actor_attr,    0, &actor_set);         
+    set_realtime_attribute(&input_attr,    0, &input_set);         
 
     /* Initialize mutex and condition variables */
     pthread_mutex_init(&mutex, NULL);
@@ -161,12 +250,13 @@ int main(int argc, char* args[]) {
     pthread_cond_init(&can_digest, NULL);
 
     /* thread creation */
-    pthread_t threads[3];
-    pthread_create(&threads[0], NULL, producer, NULL);
-    pthread_create(&threads[1], NULL, consumer, NULL);
-    pthread_create(&threads[2], NULL, actor, NULL);
+    pthread_t threads[4];
+    pthread_create(&threads[0], &producer_attr, producer, NULL);
+    pthread_create(&threads[1], &consumer_attr, consumer, NULL);
+    pthread_create(&threads[2], &actor_attr, actor, NULL);
+    pthread_create(&threads[3], &input_attr, input_handling, NULL);
 
-    for(size_t t = 0; t < 3; t++)
+    for(size_t t = 0; t < 4; t++)
         pthread_join(threads[t], NULL);
 
     return 0;
