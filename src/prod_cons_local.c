@@ -7,8 +7,8 @@
 #include <time.h>
 #include <signal.h>
 #include <termios.h>
+#include <sched.h>
 
-#include <sched.h> // sched_setaffinity
 /**
  * 
  * @author Riccardo Modolo (212370)
@@ -53,6 +53,11 @@ unsigned int producing_time = 2500;                 //time to produce message (g
 unsigned int digestion_time = 5000;                 //time tp digest message (not for global accessing but for easy edit)
 unsigned int checkqueue_time = 1000;                //time to check queue (non for global accessing but for easy edit)
 
+#define HISTORY_LEN 10000
+static struct timespec sendTimes[HISTORY_LEN];
+static struct timespec receiveTimes[HISTORY_LEN];
+struct timespec t_start;
+
 /**
  * Waiting for an amount of time in milliseconds
  * @param {ms} number of millisecond to wait
@@ -66,7 +71,7 @@ static void wait_ms(unsigned int ms) {
 
 }
 
-int set_realtime_attribute(pthread_attr_t *attr, int priority, cpu_set_t *cpuset) {
+static int set_realtime_attribute(pthread_attr_t *attr, int priority, cpu_set_t *cpuset) {
 
     int status;
     struct sched_param param;
@@ -97,6 +102,10 @@ int set_realtime_attribute(pthread_attr_t *attr, int priority, cpu_set_t *cpuset
     return status;
 }
 
+static inline double get_ms(struct timespec start, struct timespec end) {
+    return (end.tv_sec - start.tv_sec)*1E3 + (end.tv_nsec - start.tv_nsec)/1E6;
+}
+
 
 /**
  * Implementation of the consumer routine
@@ -121,7 +130,9 @@ static void* consumer(void* arg) {
         pthread_cond_signal(&can_produce);
         pthread_mutex_unlock(&mutex);
 
-        wait_ms(digestion_time);    // Emulate consumption time 
+        wait_ms(digestion_time);    // Emulate consumption time
+        clock_gettime(CLOCK_REALTIME, &receiveTimes[item]);
+
     }
     
 }
@@ -138,6 +149,7 @@ static void* producer(void* arg) {
     while (1) {
 
         wait_ms(producing_time);    // Emulate producing time
+        clock_gettime(CLOCK_REALTIME, &sendTimes[item]);
 
         pthread_mutex_lock(&mutex);
         while((write_id + 1)%BUFFER_SIZE == read_id) {
@@ -183,7 +195,25 @@ static void* actor(void* arg) {
 
 
 void interrupt_handling(int signum) {
+    double tmp;
     printf(": code interrupted\n");
+    FILE *fptr;
+    fptr = fopen("filename.csv", "w");
+
+    for (size_t q = 0; q < HISTORY_LEN; q++) {
+        tmp = get_ms(t_start, sendTimes[q]);
+        if(tmp >= 0)
+            fprintf(fptr, "%lf,", tmp);
+    }
+    fprintf(fptr, "\n");
+    for (size_t p = 0; p < HISTORY_LEN; p++) {
+        tmp = get_ms(t_start, receiveTimes[p]);
+        if(tmp >= 0)
+            fprintf(fptr, "%lf,", tmp);
+    }
+    fprintf(fptr, "\n");
+
+    fclose(fptr);
     exit(0);
 }
 
@@ -237,7 +267,7 @@ int main(int argc, char* args[]) {
     CPU_SET(2, &actor_set);
     CPU_SET(3, &input_set);
 
-
+    // set attributes for threads
     pthread_attr_t producer_attr, consumer_attr, actor_attr, input_attr;
     set_realtime_attribute(&producer_attr, 0, &producer_set);   
     set_realtime_attribute(&consumer_attr, 0, &consumer_set);   
@@ -248,7 +278,8 @@ int main(int argc, char* args[]) {
     pthread_mutex_init(&mutex, NULL);
     pthread_cond_init(&can_produce, NULL);
     pthread_cond_init(&can_digest, NULL);
-
+    
+    clock_gettime(CLOCK_REALTIME, &t_start);
     /* thread creation */
     pthread_t threads[4];
     pthread_create(&threads[0], &producer_attr, producer, NULL);
