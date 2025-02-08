@@ -24,10 +24,6 @@
  *  production rate. Otherwise (i.e.  the message length is above the
  *  given   threshold),  it  will    decrease  the   production rate. 
  * 
- * @implements:
- *  using  a  local  array  managed  with  mutex  and  condition  for 
- *  multithreading context.  
- * 
  **/
 
 
@@ -56,6 +52,8 @@ unsigned int checkqueue_time = 1000;                //time to check queue (non f
 #define HISTORY_LEN 10000
 static struct timespec sendTimes[HISTORY_LEN];
 static struct timespec receiveTimes[HISTORY_LEN];
+static struct timespec addDelta[HISTORY_LEN];
+static struct timespec delDelta[HISTORY_LEN];
 struct timespec t_start;
 
 /**
@@ -173,6 +171,7 @@ static void* producer(void* arg) {
  */
 static void* actor(void* arg) {
 
+    int item = 0;
     printf("Actor in CPU %d\n",sched_getcpu());
     while (1) {
         wait_ms(checkqueue_time);
@@ -183,37 +182,53 @@ static void* actor(void* arg) {
            ((producing_time - delta_decrease) >= MIN_PRODUCING_TIME)) {
             producing_time -= delta_decrease;
             printf("under_production, adjust rate to:%d ms\n", producing_time);
+            clock_gettime(CLOCK_REALTIME, &delDelta[item]);
+            item++;
         }
         else if((num_elem >= max_trigger) && 
                 ((producing_time + delta_decrease) <= MAX_PRODUCING_TIME)) {
             producing_time += delta_increase;
             printf("under_production, adjust rate to:%d ms\n", producing_time);
+            clock_gettime(CLOCK_REALTIME, &addDelta[item]);
+            item++;
         }
     }
     
 }
 
 
+static void add_csv_line(FILE* ptr, struct timespec* t) {
+
+    
+    double tmp = get_ms(t_start, t[0]);
+    if(tmp >= 0) {
+        fprintf(ptr, "%lf", tmp);
+    }
+    else {
+        fprintf(ptr, "0");
+    }
+    for (size_t q = 1; q < HISTORY_LEN; q++) {
+        tmp = get_ms(t_start, t[q]);
+        if(tmp >= 0)
+            fprintf(ptr, ",%lf", tmp);
+    }
+    fprintf(ptr, "\n");
+
+} 
+
 void interrupt_handling(int signum) {
-    double tmp;
+
     printf(": code interrupted\n");
     FILE *fptr;
+    
     fptr = fopen("filename.csv", "w");
-
-    for (size_t q = 0; q < HISTORY_LEN; q++) {
-        tmp = get_ms(t_start, sendTimes[q]);
-        if(tmp >= 0)
-            fprintf(fptr, "%lf,", tmp);
-    }
-    fprintf(fptr, "\n");
-    for (size_t p = 0; p < HISTORY_LEN; p++) {
-        tmp = get_ms(t_start, receiveTimes[p]);
-        if(tmp >= 0)
-            fprintf(fptr, "%lf,", tmp);
-    }
-    fprintf(fptr, "\n");
-
+    add_csv_line(fptr, sendTimes);
+    add_csv_line(fptr, receiveTimes);
+    add_csv_line(fptr, addDelta);
+    add_csv_line(fptr, delDelta);
     fclose(fptr);
+
+    system("python3 plot.py");
     exit(0);
 }
 
