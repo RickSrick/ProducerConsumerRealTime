@@ -31,23 +31,25 @@
 #define MAX_PRODUCING_TIME  15000
 #define MIN_PRODUCING_TIME  500
 
-pthread_mutex_t mutex;
-pthread_cond_t can_produce, can_digest;
-
 unsigned const int min_trigger = 2;
 unsigned const int max_trigger = 10;
 unsigned const int delta_increase = 500;
 unsigned const int delta_decrease = 500;
 
+
+pthread_mutex_t mutex;
+pthread_cond_t can_produce, can_digest;
+
 /* Shared data */
 int buffer[BUFFER_SIZE];
 int read_id = 0;
 int write_id = 0;
-int num_elem = 0;                                   //number of messages inside buff
+int num_elem = 0;                                   //number of messages inside buffer
 
-unsigned int producing_time = 2500;                 //time to produce message (global variable for accesing)
-unsigned int digestion_time = 5000;                 //time tp digest message (not for global accessing but for easy edit)
-unsigned int checkqueue_time = 1000;                //time to check queue (non for global accessing but for easy edit)
+unsigned const int initial_producing_time = 2500;
+unsigned int producing_time = initial_producing_time; //time to produce message
+unsigned int digestion_time = 5000;                   //time to  digest message
+unsigned int checkqueue_time = 1000;                  //time to check queue
 
 #define HISTORY_LEN 10000
 static struct timespec sendTimes[HISTORY_LEN];
@@ -69,6 +71,14 @@ static void wait_ms(unsigned int ms) {
 
 }
 
+
+/**
+ * Description
+ * @param {attr} attribute to set inside a thread
+ * @param {priority} priority to give to a thread
+ * @param {cpuset} data of CPU
+ * @returns 0 if correct -1 otherwise
+ */
 static int set_realtime_attribute(pthread_attr_t *attr, int priority, cpu_set_t *cpuset) {
 
     int status;
@@ -100,6 +110,13 @@ static int set_realtime_attribute(pthread_attr_t *attr, int priority, cpu_set_t 
     return status;
 }
 
+
+/**
+ * Function to compute the difference in milliseconds from two timespec
+ * @param {start} initial time
+ * @param {end} final time
+ * @returns end - start in milliseconds
+ */
 static inline double get_ms(struct timespec start, struct timespec end) {
     return (end.tv_sec - start.tv_sec)*1E3 + (end.tv_nsec - start.tv_nsec)/1E6;
 }
@@ -196,17 +213,17 @@ static void* actor(void* arg) {
     
 }
 
-
+/**
+ * put all times inside a timespec array into a csv file
+ */
 static void add_csv_line(FILE* ptr, struct timespec* t) {
 
     
     double tmp = get_ms(t_start, t[0]);
-    if(tmp >= 0) {
-        fprintf(ptr, "%lf", tmp);
-    }
-    else {
-        fprintf(ptr, "0");
-    }
+    if(tmp >= 0) { fprintf(ptr, "%lf", tmp); }
+    else { fprintf(ptr, "0"); }
+
+
     for (size_t q = 1; q < HISTORY_LEN; q++) {
         tmp = get_ms(t_start, t[q]);
         if(tmp >= 0)
@@ -214,8 +231,13 @@ static void add_csv_line(FILE* ptr, struct timespec* t) {
     }
     fprintf(ptr, "\n");
 
-} 
+}
 
+
+/**
+ * create a cvs files contain all times to make plots.
+ * used to graceful exit from the program
+ */
 void interrupt_handling(int signum) {
 
     printf(": code interrupted\n");
@@ -226,15 +248,15 @@ void interrupt_handling(int signum) {
     add_csv_line(fptr, receiveTimes);
     add_csv_line(fptr, addDelta);
     add_csv_line(fptr, delDelta);
+    fprintf(fptr, "%d, %d, %d, %d, %d", min_trigger, max_trigger, producing_time, delta_increase, delta_decrease);
     fclose(fptr);
 
-    system("python3 plot.py");
     exit(0);
 }
 
 
 /**
- * function to change via input the digestion rate
+ * function to change via input the digestion rate of the consumer
  * @param {arg} NEVER USED
  */
 static void* input_handling(void* arg) {
@@ -251,11 +273,11 @@ static void* input_handling(void* arg) {
         read(0, &c, 1);
         if (c == 'm') {
             digestion_time+= delta_increase;
-            printf("Increase DIGESTION RATE: %d\n", digestion_time);
+            printf("+ DIGESTION RATE: %d\n", digestion_time);
         }
         if( c == 'n') {
             digestion_time-= delta_decrease;
-            printf("Decrease DIGESTION RATE: %d\n", digestion_time);
+            printf("- DIGESTION RATE: %d\n", digestion_time);
         }
     }
 }
