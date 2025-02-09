@@ -28,13 +28,13 @@
 
 
 #define BUFFER_SIZE 128
-#define MAX_PRODUCING_TIME  15000
-#define MIN_PRODUCING_TIME  500
+#define MAX_PRODUCING_TIME  500
+#define MIN_PRODUCING_TIME  50
 
-unsigned const int min_trigger = 2;
-unsigned const int max_trigger = 10;
-unsigned const int delta_increase = 500;
-unsigned const int delta_decrease = 500;
+unsigned const int min_trigger = 10;
+unsigned const int max_trigger = 30;
+unsigned const int delta_increase = 20;
+unsigned const int delta_decrease = 15;
 
 
 pthread_mutex_t mutex;
@@ -46,10 +46,10 @@ int read_id = 0;
 int write_id = 0;
 int num_elem = 0;                                   //number of messages inside buffer
 
-unsigned const int initial_producing_time = 2500;
+unsigned const int initial_producing_time = 500;
 unsigned int producing_time = initial_producing_time; //time to produce message
-unsigned int digestion_time = 5000;                   //time to  digest message
-unsigned int checkqueue_time = 1000;                  //time to check queue
+unsigned int digestion_time = 200;                   //time to  digest message
+unsigned int checkqueue_time = 500;                  //time to check queue
 
 #define HISTORY_LEN 10000
 static struct timespec sendTimes[HISTORY_LEN];
@@ -92,12 +92,20 @@ static int set_realtime_attribute(pthread_attr_t *attr, int priority, cpu_set_t 
         return status;
     }
 
+    status = pthread_attr_setschedpolicy(attr, SCHED_FIFO);
+    if(status) {
+        perror("pthread_attr_setschedpolicy");
+        return status;
+    }
+
     param.sched_priority = priority;
     status = pthread_attr_setschedparam(attr, &param);
     if(status) {
         perror("pthread_attr_setschedparam");
         return status;
     }
+    
+
 
     if(cpuset != NULL) {
         status = pthread_attr_setaffinity_np(attr, sizeof(cpu_set_t), cpuset);
@@ -188,7 +196,8 @@ static void* producer(void* arg) {
  */
 static void* actor(void* arg) {
 
-    int item = 0;
+    int additem = 0;
+    int delitem = 0;
     printf("Actor in CPU %d\n",sched_getcpu());
     while (1) {
         wait_ms(checkqueue_time);
@@ -199,15 +208,15 @@ static void* actor(void* arg) {
            ((producing_time - delta_decrease) >= MIN_PRODUCING_TIME)) {
             producing_time -= delta_decrease;
             printf("under_production, adjust rate to:%d ms\n", producing_time);
-            clock_gettime(CLOCK_REALTIME, &delDelta[item]);
-            item++;
+            clock_gettime(CLOCK_REALTIME, &delDelta[delitem]);
+            delitem++;
         }
         else if((num_elem >= max_trigger) && 
                 ((producing_time + delta_decrease) <= MAX_PRODUCING_TIME)) {
             producing_time += delta_increase;
             printf("under_production, adjust rate to:%d ms\n", producing_time);
-            clock_gettime(CLOCK_REALTIME, &addDelta[item]);
-            item++;
+            clock_gettime(CLOCK_REALTIME, &addDelta[additem]);
+            additem++;
         }
     }
     
@@ -221,7 +230,6 @@ static void add_csv_line(FILE* ptr, struct timespec* t) {
     
     double tmp = get_ms(t_start, t[0]);
     if(tmp >= 0) { fprintf(ptr, "%lf", tmp); }
-    else { fprintf(ptr, "0"); }
 
 
     for (size_t q = 1; q < HISTORY_LEN; q++) {
@@ -248,7 +256,7 @@ void interrupt_handling(int signum) {
     add_csv_line(fptr, receiveTimes);
     add_csv_line(fptr, addDelta);
     add_csv_line(fptr, delDelta);
-    fprintf(fptr, "%d, %d, %d, %d, %d", min_trigger, max_trigger, producing_time, delta_increase, delta_decrease);
+    fprintf(fptr, "%d, %d, %d, %d, %d", min_trigger, max_trigger, initial_producing_time, delta_increase, delta_decrease);
     fclose(fptr);
 
     exit(0);
@@ -306,10 +314,10 @@ int main(int argc, char* args[]) {
 
     // set attributes for threads
     pthread_attr_t producer_attr, consumer_attr, actor_attr, input_attr;
-    set_realtime_attribute(&producer_attr, 0, &producer_set);   
-    set_realtime_attribute(&consumer_attr, 0, &consumer_set);   
-    set_realtime_attribute(&actor_attr,    0, &actor_set);         
-    set_realtime_attribute(&input_attr,    0, &input_set);         
+    set_realtime_attribute(&producer_attr, 98, &producer_set);
+    set_realtime_attribute(&consumer_attr, 98, &consumer_set);   
+    set_realtime_attribute(&actor_attr,    89, &actor_set);         
+    set_realtime_attribute(&input_attr,    99, &input_set);         
 
     /* Initialize mutex and condition variables */
     pthread_mutex_init(&mutex, NULL);

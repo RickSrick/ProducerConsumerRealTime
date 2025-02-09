@@ -11,6 +11,8 @@ def order_and_add (my_list, increment, decrement, initial_dim):
     i       = 0
     j       = 0
 
+    times.append(0)
+    sizes.append(initial_dim)
     while ((i < len(my_list[0])) or (j < len(my_list[1]))):
         if i >= len(my_list[0]):
             ind-= decrement
@@ -56,6 +58,8 @@ with open("filename.csv", newline='\n') as csvfile:
 
     ax2 = plt.subplot(212, sharex=ax1)
     ax2.plot(times1, sizes1, "o", color='orange')
-    ax2.set_ylabel('producer time')
-    plt.xlabel('times ms')
+    ax2.set_ylabel('production time')
+    plt.xlabel('times (ms)')
+    ax1.grid(True, axis="x", linestyle='--')
+    ax2.grid(True, axis="x", linestyle='--')
     plt.show()
