@@ -44,37 +44,9 @@ Before you begin, ensure you have the following installed:
 
 To run the program, use the following command (make sure you are sudouser for priority and scheduling assignment):
 ```bash
-sudo ./src/prod_cons_local
+./src/prod_cons_local
 ```
 This will start the producer, consumers and the analyzer. You will see alternating "produce" and "digest" messages, indicating that the Producer and Consumer are working in tandem to handle data. The analyzer will adjust the production rate based on real-time data. If you press **m** you can increment the consuming rate, with **n** you will decrease it.
-
-### 🔧 Check Priority
-```bash
-sudo ps -x | grep prod_cons_local
-```
-to find pid of the program.
-```bash
-sudo ps -m -l [PID]
-```
-here is an example of output
-```bash
-$rick sudo ps -x | grep prod_cons_local
-
-1271324 pts/4    SNl+   0:00 ./src/prod_cons_local
-1271524 pts/5    S+     0:00 grep --color=auto prod_cons_local
-
-$rick sudo ps -m -l 1271324
-
-F S   UID     PID    PPID  C PRI  NI ADDR SZ WCHAN  TTY        TIME CMD
-4 -     0 1271324 1271153  0   -   - -  9047 -      pts/4      0:00 ./src/prod_cons_local
-4 S     0       -       -  0  86   6 -     - futex_ -          0:00 -
-1 S     0       -       -  0 -39   - -     - hrtime -          0:00 -
-1 S     0       -       -  0 -39   - -     - hrtime -          0:00 -
-1 S     0       -       -  0 -39   - -     - hrtime -          0:00 -
-1 S     0       -       -  0 -39   - -     - wait_w -          0:00 -
-
-```
-to observe priority
 
 ### 📊 Building the Plot 
 
