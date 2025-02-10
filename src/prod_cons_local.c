@@ -75,7 +75,6 @@ static void wait_ms(unsigned int ms) {
 /**
  * Description
  * @param {attr} attribute to set inside a thread
- * @param {priority} priority to give to a thread
  * @param {cpuset} data of CPU
  * @returns 0 if correct -1 otherwise
  */
