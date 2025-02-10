@@ -298,41 +298,55 @@ int main(int argc, char* args[]) {
     printf("number of processors: %ld\n", number_of_processors);
 
 
-    // cpu_set_t: This data set is a bitset where each bit represents a CPU.
-    cpu_set_t producer_set, consumer_set, actor_set, input_set;
+    if(number_of_processors < 4) {
+        clock_gettime(CLOCK_REALTIME, &t_start);
+        /* thread creation */
+        pthread_t threads[4];
+        pthread_create(&threads[0], NULL, producer, NULL);
+        pthread_create(&threads[1], NULL, consumer, NULL);
+        pthread_create(&threads[2], NULL, actor, NULL);
+        pthread_create(&threads[3], NULL, input_handling, NULL);
 
-    // CPU_ZERO: This macro initializes the CPU set set to be the empty set.
-    CPU_ZERO(&producer_set);
-    CPU_ZERO(&consumer_set);
-    CPU_ZERO(&actor_set);
-    CPU_ZERO(&input_set);
-    CPU_SET(0, &producer_set);
-    CPU_SET(1, &consumer_set);
-    CPU_SET(2, &actor_set);
-    CPU_SET(3, &input_set);
+        for(size_t t = 0; t < 4; t++)
+            pthread_join(threads[t], NULL);
+    }
+    else{
+        // cpu_set_t: This data set is a bitset where each bit represents a CPU.
+        cpu_set_t producer_set, consumer_set, actor_set, input_set;
 
-    // set attributes for threads
-    pthread_attr_t producer_attr, consumer_attr, actor_attr, input_attr;
-    set_realtime_attribute(&producer_attr, 97, &producer_set);
-    set_realtime_attribute(&consumer_attr, 98, &consumer_set);   
-    set_realtime_attribute(&actor_attr,    98, &actor_set);         
-    set_realtime_attribute(&input_attr,    99, &input_set);         
+        // CPU_ZERO: This macro initializes the CPU set set to be the empty set.
+        CPU_ZERO(&producer_set);
+        CPU_ZERO(&consumer_set);
+        CPU_ZERO(&actor_set);
+        CPU_ZERO(&input_set);
+        CPU_SET(0, &producer_set);
+        CPU_SET(1, &consumer_set);
+        CPU_SET(2, &actor_set);
+        CPU_SET(3, &input_set);
 
-    /* Initialize mutex and condition variables */
-    pthread_mutex_init(&mutex, NULL);
-    pthread_cond_init(&can_produce, NULL);
-    pthread_cond_init(&can_digest, NULL);
-    
-    clock_gettime(CLOCK_REALTIME, &t_start);
-    /* thread creation */
-    pthread_t threads[4];
-    pthread_create(&threads[0], &producer_attr, producer, NULL);
-    pthread_create(&threads[1], &consumer_attr, consumer, NULL);
-    pthread_create(&threads[2], &actor_attr, actor, NULL);
-    pthread_create(&threads[3], &input_attr, input_handling, NULL);
+        // set attributes for threads
+        pthread_attr_t producer_attr, consumer_attr, actor_attr, input_attr;
+        set_realtime_attribute(&producer_attr, 97, &producer_set);
+        set_realtime_attribute(&consumer_attr, 98, &consumer_set);   
+        set_realtime_attribute(&actor_attr,    98, &actor_set);         
+        set_realtime_attribute(&input_attr,    99, &input_set);         
 
-    for(size_t t = 0; t < 4; t++)
-        pthread_join(threads[t], NULL);
+        /* Initialize mutex and condition variables */
+        pthread_mutex_init(&mutex, NULL);
+        pthread_cond_init(&can_produce, NULL);
+        pthread_cond_init(&can_digest, NULL);
+        
+        clock_gettime(CLOCK_REALTIME, &t_start);
+        /* thread creation */
+        pthread_t threads[4];
+        pthread_create(&threads[0], &producer_attr, producer, NULL);
+        pthread_create(&threads[1], &consumer_attr, consumer, NULL);
+        pthread_create(&threads[2], &actor_attr, actor, NULL);
+        pthread_create(&threads[3], &input_attr, input_handling, NULL);
+
+        for(size_t t = 0; t < 4; t++)
+            pthread_join(threads[t], NULL);
+    }
 
     return 0;
 }
