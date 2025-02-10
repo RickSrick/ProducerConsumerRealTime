@@ -58,12 +58,12 @@ sudo ps -m -l [PID]
 ```
 here is an example of output
 ```bash
-$rick ps -x | grep prod_cons_local
+$rick sudo ps -x | grep prod_cons_local
 
 1271324 pts/4    SNl+   0:00 ./src/prod_cons_local
 1271524 pts/5    S+     0:00 grep --color=auto prod_cons_local
 
-$rick ps -m -l 1271324
+$rick sudo ps -m -l 1271324
 
 F S   UID     PID    PPID  C PRI  NI ADDR SZ WCHAN  TTY        TIME CMD
 4 -     0 1271324 1271153  0   -   - -  9047 -      pts/4      0:00 ./src/prod_cons_local
