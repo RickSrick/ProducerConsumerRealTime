@@ -31,10 +31,10 @@
 #define MAX_PRODUCING_TIME  500
 #define MIN_PRODUCING_TIME  50
 
-unsigned const int min_trigger = 10;
-unsigned const int max_trigger = 30;
-unsigned const int delta_increase = 20;
-unsigned const int delta_decrease = 15;
+const int min_trigger = 10;
+const int max_trigger = 30;
+const int delta_increase = 20;
+const int delta_decrease = 15;
 
 
 pthread_mutex_t mutex;
@@ -46,10 +46,10 @@ int read_id = 0;
 int write_id = 0;
 int num_elem = 0;                                   //number of messages inside buffer
 
-unsigned const int initial_producing_time = 500;
-unsigned int producing_time = initial_producing_time; //time to produce message
-unsigned int digestion_time = 200;                   //time to  digest message
-unsigned int checkqueue_time = 500;                  //time to check queue
+const int initial_producing_time = 500;
+int producing_time = initial_producing_time; //time to produce message
+int digestion_time = 200;                   //time to  digest message
+int checkqueue_time = 500;                  //time to check queue
 
 #define HISTORY_LEN 10000
 static struct timespec sendTimes[HISTORY_LEN];
@@ -105,7 +105,6 @@ static int set_realtime_attribute(pthread_attr_t *attr, int priority, cpu_set_t 
         return status;
     }
     
-
 
     if(cpuset != NULL) {
         status = pthread_attr_setaffinity_np(attr, sizeof(cpu_set_t), cpuset);
@@ -283,7 +282,7 @@ static void* input_handling(void* arg) {
             digestion_time+= delta_increase;
             printf("+ DIGESTION RATE: %d\n", digestion_time);
         }
-        if( c == 'n') {
+        if (c == 'n' && (digestion_time-delta_decrease)>= 0) {
             digestion_time-= delta_decrease;
             printf("- DIGESTION RATE: %d\n", digestion_time);
         }
@@ -314,9 +313,9 @@ int main(int argc, char* args[]) {
 
     // set attributes for threads
     pthread_attr_t producer_attr, consumer_attr, actor_attr, input_attr;
-    set_realtime_attribute(&producer_attr, 98, &producer_set);
+    set_realtime_attribute(&producer_attr, 97, &producer_set);
     set_realtime_attribute(&consumer_attr, 98, &consumer_set);   
-    set_realtime_attribute(&actor_attr,    89, &actor_set);         
+    set_realtime_attribute(&actor_attr,    98, &actor_set);         
     set_realtime_attribute(&input_attr,    99, &input_set);         
 
     /* Initialize mutex and condition variables */
