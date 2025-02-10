@@ -351,6 +351,7 @@ int main(int argc, char* args[]) {
 
         if(status != 0) {
             printf("some error occurs during pthread creation, for priority assignment you need to be superuser\n");
+            return -1;
         }
 
         for(size_t t = 0; t < 4; t++)
