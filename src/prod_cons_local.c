@@ -92,6 +92,12 @@ static int set_realtime_attribute(pthread_attr_t *attr, int priority, cpu_set_t 
         return status;
     }
 
+    status = pthread_attr_setinheritsched(attr, PTHREAD_EXPLICIT_SCHED);
+    if(status) {
+        perror("pthread_attr_setinheritsched");
+        return status;
+    }
+
     status = pthread_attr_setschedpolicy(attr, SCHED_FIFO);
     if(status) {
         perror("pthread_attr_setschedpolicy");
@@ -104,7 +110,6 @@ static int set_realtime_attribute(pthread_attr_t *attr, int priority, cpu_set_t 
         perror("pthread_attr_setschedparam");
         return status;
     }
-    
 
     if(cpuset != NULL) {
         status = pthread_attr_setaffinity_np(attr, sizeof(cpu_set_t), cpuset);
@@ -297,7 +302,6 @@ int main(int argc, char* args[]) {
     long number_of_processors = sysconf(_SC_NPROCESSORS_ONLN);
     printf("number of processors: %ld\n", number_of_processors);
 
-
     if(number_of_processors < 4) {
         clock_gettime(CLOCK_REALTIME, &t_start);
         /* thread creation */
@@ -326,10 +330,10 @@ int main(int argc, char* args[]) {
 
         // set attributes for threads
         pthread_attr_t producer_attr, consumer_attr, actor_attr, input_attr;
-        set_realtime_attribute(&producer_attr, 97, &producer_set);
+        set_realtime_attribute(&producer_attr, 98, &producer_set);
         set_realtime_attribute(&consumer_attr, 98, &consumer_set);   
         set_realtime_attribute(&actor_attr,    98, &actor_set);         
-        set_realtime_attribute(&input_attr,    99, &input_set);         
+        set_realtime_attribute(&input_attr,    98, &input_set);         
 
         /* Initialize mutex and condition variables */
         pthread_mutex_init(&mutex, NULL);
@@ -339,10 +343,15 @@ int main(int argc, char* args[]) {
         clock_gettime(CLOCK_REALTIME, &t_start);
         /* thread creation */
         pthread_t threads[4];
-        pthread_create(&threads[0], &producer_attr, producer, NULL);
-        pthread_create(&threads[1], &consumer_attr, consumer, NULL);
-        pthread_create(&threads[2], &actor_attr, actor, NULL);
-        pthread_create(&threads[3], &input_attr, input_handling, NULL);
+        int status = 0;
+        status = pthread_create(&threads[0], &producer_attr, producer, NULL);
+        status = pthread_create(&threads[1], &consumer_attr, consumer, NULL);
+        status = pthread_create(&threads[2], &actor_attr, actor, NULL);
+        status = pthread_create(&threads[3], &input_attr, input_handling, NULL);
+
+        if(status != 0) {
+            printf("some error occurs during pthread creation, for priority assignment you need to be superuser\n");
+        }
 
         for(size_t t = 0; t < 4; t++)
             pthread_join(threads[t], NULL);

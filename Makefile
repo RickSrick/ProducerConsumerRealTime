@@ -1,7 +1,7 @@
 PROGRAMS = src/prod_cons_queue \
            src/prod_cons_local 
 		   
-LDLIBS = -lpthread
+LDLIBS = -pthread
 
 # NOTE:
 # here we are using a hidden implicit rule that links any .c file into an executable
