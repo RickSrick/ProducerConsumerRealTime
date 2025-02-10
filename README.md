@@ -46,7 +46,7 @@ To run the program, use the following command (make sure you are sudouser for pr
 ```bash
 ./src/prod_cons_local
 ```
-This will start the producer, consumers and the analyzer. You will see alternating "produce" and "digest" messages, indicating that the Producer and Consumer are working in tandem to handle data. The analyzer will adjust the production rate based on real-time data. If you press **m** you can increment the consuming rate, with **n** you will decrease it.
+This will start the producer, consumers and the analyzer. You will see alternating "produce" and "digest" messages, indicating that the Producer and Consumer are working in tandem to handle data. The analyzer will adjust the production rate based on real-time data. If you press **m** you can increment the consuming rate, with **n** you will decrease it.When you want close pressing *CTRL+C*
 
 ### 📊 Building the Plot 
 

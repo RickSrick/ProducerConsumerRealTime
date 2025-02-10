@@ -227,7 +227,7 @@ void interrupt_handling(int signum) {
     printf(": code interrupted\n");
     FILE *fptr;
     
-    fptr = fopen("filename.csv", "w");
+    fptr = fopen("plot.csv", "w");
     add_csv_line(fptr, sendTimes);
     add_csv_line(fptr, receiveTimes);
     add_csv_line(fptr, addDelta);

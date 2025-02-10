@@ -38,7 +38,7 @@ def order_and_add (my_list, increment, decrement, initial_dim):
     
     return [times, sizes]
 
-with open("filename.csv", newline='\n') as csvfile:
+with open("plot.csv", newline='\n') as csvfile:
     csvreader = csv.reader(csvfile)
 
     for row in csvreader:
